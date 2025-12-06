@@ -1,42 +1,55 @@
 import { Client } from "pg";
 
-const isProduction = process.env.NODE_ENV === "production";
+function validateEnv() {
+  const required = [
+    "POSTGRES_HOST",
+    "POSTGRES_PORT",
+    "POSTGRES_USER",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_DB",
+  ];
+
+  for (const key of required) {
+    if (!process.env[key]) {
+      throw new Error(`Variável de ambiente ausente: ${key}`);
+    }
+  }
+}
 
 function createClient() {
-  const isNeon = process.env.POSTGRES_HOST.includes("neon.tech");
+  validateEnv();
+
+  const host = process.env.POSTGRES_HOST;
+  const isNeon = host.includes("neon.tech");
 
   return new Client({
-    host: process.env.POSTGRES_HOST,
-    port: Number(process.env.POSTGRES_PORT), // ✔️ corrigido
+    host,
+    port: Number(process.env.POSTGRES_PORT),
     user: process.env.POSTGRES_USER,
     database: process.env.POSTGRES_DB,
     password: process.env.POSTGRES_PASSWORD,
-    ssl: isNeon
-      ? { require: true, rejectUnauthorized: false } // ✔️ Neon exige
-      : false, // ✔️ local
+    ssl: isNeon ? { require: true, rejectUnauthorized: false } : false,
   });
 }
 
 async function query(queryObject) {
   const client = createClient();
 
-  console.log("Credenciais do postgres:", {
+  console.log("Conectando ao Postgres:", {
     host: process.env.POSTGRES_HOST,
     port: process.env.POSTGRES_PORT,
     user: process.env.POSTGRES_USER,
     database: process.env.POSTGRES_DB,
-    password: process.env.POSTGRES_PASSWORD,
-    ssl: isProduction ? "SSL ON (by NODE_ENV)" : "SSL OFF (NODE_ENV)",
-    sslReal: process.env.POSTGRES_HOST.includes("neon.tech")
-      ? "SSL FORÇADO POR NEON"
-      : "SEM SSL",
+    ssl: process.env.POSTGRES_HOST.includes("neon.tech")
+      ? "Neon SSL"
+      : "Local (sem SSL)",
   });
 
   try {
     await client.connect();
     return await client.query(queryObject);
   } catch (error) {
-    console.error("Erro ao conectar ao banco:", error);
+    console.error("Erro no banco:", error);
     throw error;
   } finally {
     await client.end();
